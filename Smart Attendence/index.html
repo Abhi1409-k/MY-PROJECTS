@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Smart Attendance System</h1>
+            <div class="user-info">
+                <span id="current-user">Not logged in</span>
+                <button id="logout-btn" style="display: none;">Logout</button>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="attendance-section">Mark Attendance</button>
+            <button class="tab-btn" data-tab="student-section">Student Panel</button>
+            <button class="tab-btn" data-tab="professor-section">Professor Panel</button>
+        </div>
+
+        <section id="attendance-section" class="tab-content active">
+            <div class="attendance-container">
+                <h2>Student Attendance</h2>
+                
+                <div class="form-group">
+                    <label for="registration-no">Registration Number:</label>
+                    <input type="text" id="registration-no" placeholder="Enter your registration number">
+                </div>
+                
+                <div class="form-group">
+                    <label for="attendance-subject">Subject:</label>
+                    <select id="attendance-subject">
+                        <option value="">-- Select Subject --</option>
+                        <!-- Options will be populated via JavaScript -->
+                    </select>
+                </div>
+                
+                <button id="mark-attendance-btn">Mark Attendance</button>
+                
+                <div id="student-profile" class="profile-container" style="display: none;">
+                    <div class="profile-header">
+                        <div class="profile-image-container">
+                            <div class="profile-image-placeholder">
+                                <span>Photo</span>
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h3 id="profile-name"></h3>
+                            <p id="profile-id"></p>
+                            <p id="profile-branch"></p>
+                            <p id="profile-semester"></p>
+                        </div>
+                    </div>
+                    
+                    <div id="attendance-status" class="attendance-status">
+                        <!-- Attendance status will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="student-section" class="tab-content">
+            <div class="login-panel" id="student-login-panel">
+                <h2>Student Login</h2>
+                <div class="form-group">
+                    <label for="student-username">Username:</label>
+                    <input type="text" id="student-username" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label for="student-password">Password:</label>
+                    <input type="password" id="student-password" placeholder="Enter your password">
+                </div>
+                <button id="student-login-btn">Login</button>
+            </div>
+            
+            <div id="student-dashboard" class="dashboard" style="display: none;">
+                <div class="profile-container">
+                    <div class="profile-header">
+                        <div class="profile-image-container">
+                            <div class="profile-image-placeholder">
+                                <span>Photo</span>
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h3 id="student-profile-name"></h3>
+                            <p id="student-profile-id"></p>
+                            <p id="student-profile-branch"></p>
+                            <p id="student-profile-semester"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="attendance-summary">
+                        <h3>Attendance Summary</h3>
+                        <div class="summary-cards">
+                            <div class="card">
+                                <h4>CS101</h4>
+                                <p>Attendance: <span id="cs101-attendance">0%</span></p>
+                            </div>
+                            <div class="card">
+                                <h4>CS201</h4>
+                                <p>Attendance: <span id="cs201-attendance">0%</span></p>
+                            </div>
+                            <div class="card">
+                                <h4>CS301</h4>
+                                <p>Attendance: <span id="cs301-attendance">0%</span></p>
+                            </div>
+                            <div class="card">
+                                <h4>CS401</h4>
+                                <p>Attendance: <span id="cs401-attendance">0%</span></p>
+                            </div>
+                            <div class="card">
+                                <h4>CS501</h4>
+                                <p>Attendance: <span id="cs501-attendance">0%</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="attendance-details">
+                        <h3>Detailed Attendance</h3>
+                        <div class="form-group">
+                            <label for="student-course-select">Select Subject:</label>
+                            <select id="student-course-select">
+                                <option value="">-- Select Subject --</option>
+                                <!-- Options will be populated via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <table id="student-attendance-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-details-list">
+                                <!-- Attendance details will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="professor-section" class="tab-content">
+            <div class="login-panel" id="professor-login-panel">
+                <h2>Professor Login</h2>
+                <div class="form-group">
+                    <label for="professor-username">Username:</label>
+                    <input type="text" id="professor-username" placeholder="Enter your username">
+                </div>
+                <div class="form-group">
+                    <label for="professor-password">Password:</label>
+                    <input type="password" id="professor-password" placeholder="Enter your password">
+                </div>
+                <button id="professor-login-btn">Login</button>
+            </div>
+            
+            <div id="professor-dashboard" class="dashboard" style="display: none;">
+                <div class="profile-container">
+                    <div class="profile-header">
+                        <div class="profile-image-container">
+                            <div class="profile-image-placeholder">
+                                <span>Photo</span>
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h3 id="professor-profile-name"></h3>
+                            <p id="professor-profile-id"></p>
+                            <p id="professor-profile-department"></p>
+                        </div>
+                    </div>
+                
+                    <div class="professor-controls">
+                        <h3>Attendance Management</h3>
+                        <div class="form-group">
+                            <label for="course-select">Select Subject:</label>
+                            <select id="course-select">
+                                <option value="">-- Select Subject --</option>
+                                <!-- Options will be populated via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="date-select">Select Date:</label>
+                            <input type="date" id="date-select">
+                        </div>
+                        
+                        <button id="load-students-btn">Load Students</button>
+                        
+                        <div class="attendance-list">
+                            <h3>Review Attendance</h3>
+                            <table id="attendance-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student ID</th>
+                                        <th>Name</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-list">
+                                    <!-- Student data will be loaded here -->
+                                </tbody>
+                            </table>
+                            <button id="save-attendance-btn">Save Changes</button>
+                        </div>
+                        
+                        <div class="attendance-stats">
+                            <h3>Attendance Statistics</h3>
+                            <div class="stats-cards">
+                                <div class="card">
+                                    <h4>Total Students</h4>
+                                    <p id="stats-total">0</p>
+                                </div>
+                                <div class="card">
+                                    <h4>Present</h4>
+                                    <p id="stats-present">0</p>
+                                </div>
+                                <div class="card">
+                                    <h4>Absent</h4>
+                                    <p id="stats-absent">0</p>
+                                </div>
+                                <div class="card">
+                                    <h4>Attendance Rate</h4>
+                                    <p id="stats-rate">0%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Smart Attendance System</p>
+    </footer>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
