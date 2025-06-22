@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecast</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="card">
+        <h1 class="app-title">Weather Forecast</h1>
+        
+        <div class="search">
+            <input type="text" placeholder="Enter City Name" spellcheck="false">
+            <button><img src="images/search.png" alt="Search"></button>
+        </div>
+        
+        <div class="error">
+            <p>City not found. Please try again.</p>
+        </div>
+        
+        <div class="loading">
+            <div class="loader"></div>
+        </div>
+        
+        <div class="main-content">
+            <div class="weather-column">
+                <div class="weather">
+                    <img src="images/rain.png" class="weather-icon" alt="Weather Icon">
+                    <h1 class="temp">22°C</h1>
+                    <h2 class="city">New York</h2>
+                    <p class="weather-description">Cloudy</p>
+                    
+                    <div class="details-container">
+                        <div class="details">
+                            <div class="col">
+                                <img src="images/humidity.png" alt="Humidity">
+                                <div>
+                                    <p class="humidity">50%</p>
+                                    <p>Humidity</p>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <img src="images/wind.png" alt="Wind">
+                                <div>
+                                    <p class="wind">15 km/h</p>
+                                    <p>Wind speed</p>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <img src="images/pressure.png" alt="Pressure">
+                                <div>
+                                    <p class="pressure">1013 hPa</p>
+                                    <p>Pressure</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="additional-info">
+                            <div class="col">
+                                <div>
+                                    <p class="feels-like">24°C</p>
+                                    <p>Feels Like</p>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div>
+                                    <p class="min-max">20°C / 26°C</p>
+                                    <p>Min / Max</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="sunrise-sunset">
+                            <div class="col">
+                                <img src="images/sunrise.png" alt="Sunrise">
+                                <div>
+                                    <p class="sunrise">06:30 AM</p>
+                                    <p>Sunrise</p>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <img src="images/sunset.png" alt="Sunset">
+                                <div>
+                                    <p class="sunset">07:15 PM</p>
+                                    <p>Sunset</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="forecast-column">
+                <div class="forecast-section">
+                    <h3>5-Day Forecast</h3>
+                    <div class="forecast-nav">
+                        <button class="prev-btn">❮</button>
+                        <button class="next-btn">❯</button>
+                    </div>
+                    <div class="forecast-container">
+                        <!-- Forecast items will be added here by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Data provided by <a href="https://openweathermap.org/" target="_blank">OpenWeather</a> | Last updated: <span id="update-time"></span></p>
+        </footer>
+    </div>
+    
+    <!-- Linking JS -->
+    <script src="script.js"></script>
+</body>
+</html>
