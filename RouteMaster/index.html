@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0f172a" />
+<title>RouteMaster — Route Optimization Platform</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet.antimeridian@1.0.0/dist/leaflet.antimeridian-src.js"></script>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.19/leaflet-maplibre-gl.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','monospace'] },
+    colors: { brand: {50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',900:'#1e3a8a'} }
+  }}
+}
+</script>
+
+<style>
+  * { -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+  html, body { font-family: 'Inter', system-ui, sans-serif; }
+  body { overflow-x: hidden; }
+  .num { font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum'; }
+
+  /* ---------- MAP SIZING ---------- */
+  #map { width: 100%; height: 100%; background: #e5e7eb; }
+
+  /* Leaflet polish */
+  .leaflet-container { font-family: 'Inter', sans-serif !important; background: #e5e7eb !important; }
+  .leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 4px 20px rgba(15,23,42,0.12) !important; border: 1px solid #e2e8f0 !important; }
+  .leaflet-popup-content { margin: 10px 14px !important; font-size: 13px !important; color: #0f172a !important; }
+  .leaflet-control-zoom a { background:#fff !important; color:#334155 !important; border-color:#e2e8f0 !important; width:32px !important; height:32px !important; line-height:32px !important; font-size:16px !important; }
+  .leaflet-control-zoom a:hover { background:#f8fafc !important; color:#2563eb !important; }
+  .leaflet-bar { border-radius:8px !important; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,0.08) !important; }
+
+  /* On phones, make zoom controls bigger for touch */
+  @media (max-width: 640px) {
+    .leaflet-control-zoom a { width: 40px !important; height: 40px !important; line-height: 40px !important; font-size: 20px !important; }
+  }
+
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:4px; }
+
+  .fade-in { animation: fadeIn .25s ease-out; }
+  @keyframes fadeIn { from {opacity:0;transform:translateY(4px);} to {opacity:1;transform:translateY(0);} }
+
+  /* ---------- FORM FIELDS ---------- */
+  .field {
+    width:100%;
+    padding:12px 12px;
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    font-size:15px;
+    color:#0f172a;
+    transition:all .15s;
+    outline:none;
+    min-height: 46px; /* good touch target */
+  }
+  /* iOS zooms in on inputs < 16px */
+  @media (max-width: 767px) {
+    .field { font-size: 16px; padding: 13px 12px; }
+  }
+  .field::placeholder { color:#94a3b8; }
+  .field:hover { border-color:#cbd5e1; }
+  .field:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+
+  select.field { cursor:pointer; appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+
+  input[type="range"] { -webkit-appearance:none; appearance:none; height:6px; background:#e2e8f0; border-radius:3px; outline:none; width: 100%; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background:#2563eb; cursor:pointer; border:3px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+  input[type="range"]::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:#2563eb; cursor:pointer; border:3px solid #fff; }
+
+  .mode-btn { transition:all .15s; min-height: 40px; }
+  .mode-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .mode-btn.active-cost { background:#059669; color:#fff; border-color:#059669; }
+
+  /* Buttons — ensure min 44px touch target */
+  .btn-primary { min-height: 46px; }
+
+  .rec-card { transition: all .15s; }
+  @media (hover: hover) {
+    .rec-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,0.08); }
+  }
+
+  .fuel-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.03em; }
+
+  /* ---------- STICKY MOBILE HEADER ---------- */
+  @media (max-width: 1023px) {
+    .mobile-sticky-map {
+      position: sticky;
+      top: 56px; /* header height */
+      z-index: 20;
+    }
+  }
+
+  /* ---------- RESPONSIVE TABLE ---------- */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll table { min-width: 320px; }
+
+  /* ---------- SAFE AREA (iPhone notch) ---------- */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    body { padding-bottom: env(safe-area-inset-bottom); }
+  }
+</style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 antialiased">
+
+<!-- =================== HEADER =================== -->
+<header class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-4 lg:px-6 sticky top-0 z-30">
+  <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+    <div class="w-8 h-8 rounded-md bg-slate-900 flex items-center justify-center flex-shrink-0">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+    </div>
+    <div class="flex flex-col leading-tight min-w-0">
+      <span class="text-[14px] sm:text-[15px] font-semibold tracking-tight truncate">RouteMaster</span>
+      <span class="text-[11px] text-slate-500 tracking-wide truncate hidden sm:block">Route Optimization Platform</span>
+    </div>
+  </div>
+
+  <nav class="flex items-center gap-0 sm:gap-1 flex-shrink-0">
+    <button id="tabRoute" class="px-2.5 sm:px-3 lg:px-4 h-14 text-[13px] sm:text-sm font-medium border-b-2 transition-colors tab-active flex items-center gap-1.5 sm:gap-2">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      <span>Route</span>
+      <span class="hidden md:inline">Finder</span>
+    </button>
+    <button id="tabTrip" class="px-2.5 sm:px-3 lg:px-4 h-14 text-[13px] sm:text-sm font-medium border-b-2 transition-colors tab-inactive flex items-center gap-1.5 sm:gap-2">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+      <span>Trip</span>
+      <span class="hidden md:inline">Planner</span>
+    </button>
+  </nav>
+
+  <div class="hidden lg:flex items-center gap-2 text-xs text-slate-500 flex-shrink-0">
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>Live</span>
+  </div>
+</header>
+
+<!-- =================== MAIN LAYOUT =================== -->
+<!--
+  Mobile / Tablet: single column stack.
+    Row 1: Sidebar (fuel widget + form + results) — full width
+    Row 2: Map — fixed viewport-relative height
+  Desktop (lg+): side by side.
+-->
+<div class="lg:h-[calc(100vh-3.5rem)] lg:flex lg:overflow-hidden">
+
+  <!-- SIDEBAR — first on mobile -->
+  <aside class="w-full lg:w-[420px] lg:h-full bg-white lg:border-r border-slate-200 lg:overflow-y-auto order-1 lg:order-1">
+
+    <!-- Fuel widget -->
+    <div class="px-4 sm:px-5 lg:px-6 py-4 sm:py-5 border-b border-slate-100" id="fuelWidgetContainer">
+      <!-- injected by JS -->
+    </div>
+
+    <!-- ROUTE TAB -->
+    <div id="routeTabContent" class="px-4 sm:px-5 lg:px-6 py-5 sm:py-6 space-y-5 sm:space-y-6" style="display:block">
+      <section>
+        <div class="flex items-baseline justify-between mb-4">
+          <h2 class="text-[15px] font-semibold tracking-tight">Plan a route</h2>
+          <span class="text-[11px] text-slate-400 uppercase tracking-wider">Dijkstra</span>
+        </div>
+        <form id="routeForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1.5">Origin</label>
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="#22c55e"/></svg>
+              <input id="origin" type="text" inputmode="text" autocomplete="off" class="field pl-9" placeholder="e.g. Mumbai" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1.5">Destination</label>
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="#ef4444"/></svg>
+              <input id="destination" type="text" inputmode="text" autocomplete="off" class="field pl-9" placeholder="e.g. Pune" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1.5">Optimize for</label>
+            <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
+              <button type="button" data-mode="time" class="mode-btn active text-xs font-medium py-2 rounded-md border border-transparent">Fastest route</button>
+              <button type="button" data-mode="cost" class="mode-btn text-xs font-medium py-2 rounded-md border border-transparent text-slate-600">Lowest fuel cost</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Fuel type</label>
+              <select id="fuelType" class="field"><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="cng">CNG</option></select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Price (₹/L)</label>
+              <input id="fuelPrice" type="number" inputmode="decimal" step="0.01" value="106.31" class="field num" />
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-medium text-slate-600">Vehicle mileage</label>
+              <span class="text-xs text-slate-500"><span id="mileageVal" class="num font-semibold text-slate-900">15</span> km/L</span>
+            </div>
+            <input id="mileage" type="range" min="5" max="30" step="0.5" value="15" />
+            <div class="flex justify-between text-[10px] text-slate-400 mt-1 tracking-wide"><span>5 · Truck</span><span>15 · Car</span><span>30 · Bike</span></div>
+          </div>
+          <div id="routeError" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-md p-2.5"></div>
+          <button id="routeSubmit" type="submit" class="btn-primary w-full rounded-lg bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span id="routeSubmitText">Calculate route</span>
+          </button>
+        </form>
+      </section>
+
+      <section id="routeResult" class="hidden pt-5 border-t border-slate-100"></section>
+    </div>
+
+    <!-- TRIP TAB -->
+    <div id="tripTabContent" class="px-4 sm:px-5 lg:px-6 py-5 sm:py-6 space-y-5" style="display:none">
+      <div>
+        <h2 class="text-[15px] font-semibold tracking-tight mb-1">Trip planner</h2>
+        <p class="text-xs text-slate-500">Compare flight, train, bus and car options.</p>
+      </div>
+      <form id="tripForm" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">From</label>
+          <input id="tripOrigin" type="text" inputmode="text" autocomplete="off" class="field" placeholder="e.g. Delhi" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">To</label>
+          <input id="tripDestination" type="text" inputmode="text" autocomplete="off" class="field" placeholder="e.g. Bengaluru" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Travel date <span class="text-slate-400 font-normal">(optional)</span></label>
+          <input id="tripDate" type="date" class="field" />
+        </div>
+        <div id="tripError" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-md p-2.5"></div>
+        <button id="tripSubmit" type="submit" class="btn-primary w-full rounded-lg bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span id="tripSubmitText">Compare options</span>
+        </button>
+      </form>
+      <div id="tripResult"></div>
+    </div>
+  </aside>
+
+  <!-- MAP — second on mobile -->
+  <main class="relative w-full lg:flex-1 bg-slate-200 order-2 lg:order-2
+               h-[60vh] min-h-[400px] max-h-[600px]
+               lg:h-full lg:min-h-0 lg:max-h-none">
+    <div id="map"></div>
+
+    <div id="mapPlaceholder" class="absolute inset-0 flex items-center justify-center pointer-events-none z-[400] px-4">
+      <div class="bg-white/95 backdrop-blur border border-slate-200 rounded-lg px-4 sm:px-5 py-3 sm:py-4 shadow-sm max-w-xs text-center">
+        <div class="mx-auto mb-2 w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        </div>
+        <p class="text-xs font-medium text-slate-700">No route selected</p>
+        <p class="text-[11px] text-slate-500 mt-1">Enter origin and destination to begin.</p>
+      </div>
+    </div>
+
+    <div id="mapLoading" class="hidden absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-[500]">
+      <div class="bg-white rounded-lg shadow-lg border border-slate-200 px-4 sm:px-5 py-3 sm:py-4 flex items-center gap-3">
+        <div class="w-4 h-4 rounded-full border-2 border-slate-200 border-t-slate-900 animate-spin"></div>
+        <span class="text-xs sm:text-sm text-slate-700">Computing optimal path…</span>
+      </div>
+    </div>
+
+    <div id="mapLegend" class="hidden absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-auto z-[400] bg-white/95 backdrop-blur border border-slate-200 rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-sm">
+      <div class="flex items-center justify-center sm:justify-start flex-wrap gap-x-3 gap-y-1 sm:gap-4 text-[10px] sm:text-[11px] text-slate-600">
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Start</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> End</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-brand-600"></span> Road</span>
+        <span id="mapModeLabel" class="hidden flex items-center gap-1"><span class="w-3 h-0.5 bg-amber-500"></span> Air / Sea</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ================================================================
+   MAP
+   ================================================================ */
+const map = L.map('map', { zoomControl: true, attributionControl: false, worldCopyJump: false });
+map.setView([21.0, 78.0], 5);
+
+L.maplibreGL({ style: 'https://tiles.openfreemap.org/styles/liberty' }).addTo(map);
+
+L.control.attribution({ position: 'bottomright', prefix: false })
+  .addAttribution('© OpenFreeMap · OSM').addTo(map);
+
+// Re-invalidate on every stage. Especially on mobile where layout settles late.
+function invalidate() { try { map.invalidateSize(); } catch {} }
+[0, 100, 300, 600, 1000, 2000].forEach(ms => setTimeout(invalidate, ms));
+window.addEventListener('load', invalidate);
+window.addEventListener('resize', invalidate);
+window.addEventListener('orientationchange', () => setTimeout(invalidate, 250));
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', invalidate);
+  window.visualViewport.addEventListener('scroll', invalidate);
+}
+
+let routeLayer = null;
+
+const startIcon = L.divIcon({ className:'', html:`<div style="width:16px;height:16px;background:#10b981;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(16,185,129,0.5);"></div>`, iconSize:[16,16], iconAnchor:[8,8] });
+const endIcon   = L.divIcon({ className:'', html:`<div style="width:16px;height:16px;background:#ef4444;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(239,68,68,0.5);"></div>`, iconSize:[16,16], iconAnchor:[8,8] });
+const wpIcon    = L.divIcon({ className:'', html:`<div style="width:11px;height:11px;background:#f59e0b;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(245,158,11,0.6);"></div>`, iconSize:[11,11], iconAnchor:[5.5,5.5] });
+
+/* ================================================================
+   CONTINENT / LAND CONNECTIVITY
+   ================================================================ */
+const CONTINENT = {
+  IN:'asia', NP:'asia', BT:'asia', BD:'asia', PK:'asia', LK:'asia', MV:'asia',
+  CN:'asia', JP:'asia', KR:'asia', TW:'asia', PH:'asia', ID:'asia',
+  TH:'asia', VN:'asia', LA:'asia', KH:'asia', MM:'asia', MY:'asia', SG:'asia',
+  AE:'asia', OM:'asia', SA:'asia', QA:'asia', KW:'asia', BH:'asia', YE:'asia',
+  IR:'asia', IQ:'asia', TR:'asia', RU:'asia', KZ:'asia', UZ:'asia', TM:'asia',
+  KG:'asia', TJ:'asia', AF:'asia', MN:'asia', GE:'asia', AM:'asia', AZ:'asia',
+  DE:'europe', FR:'europe', IT:'europe', ES:'europe', GB:'europe', NL:'europe',
+  BE:'europe', CH:'europe', AT:'europe', PL:'europe', PT:'europe', SE:'europe',
+  NO:'europe', DK:'europe', FI:'europe', IE:'europe', GR:'europe', CZ:'europe',
+  HU:'europe', RO:'europe', BG:'europe', UA:'europe', BY:'europe', HR:'europe',
+  RS:'europe', SK:'europe', SI:'europe', LT:'europe', LV:'europe', EE:'europe',
+  EG:'africa', ZA:'africa', KE:'africa', NG:'africa', ET:'africa', MA:'africa',
+  DZ:'africa', TN:'africa', LY:'africa', SD:'africa', TZ:'africa', UG:'africa',
+  GH:'africa', SN:'africa', CI:'africa', CM:'africa', ZM:'africa', ZW:'africa',
+  MZ:'africa', AO:'africa', NA:'africa', BW:'africa', CD:'africa', SO:'africa',
+  US:'namerica', CA:'namerica', MX:'namerica', GT:'namerica', HN:'namerica',
+  SV:'namerica', NI:'namerica', CR:'namerica', PA:'namerica', CU:'namerica',
+  BR:'samerica', AR:'samerica', CL:'samerica', PE:'samerica', CO:'samerica',
+  VE:'samerica', EC:'samerica', BO:'samerica', PY:'samerica', UY:'samerica',
+  AU:'australia', NZ:'australia',
+};
+const ISLAND_NATIONS = new Set(['JP','LK','MV','PH','ID','TW','MU','SC','FJ','PG','NZ','GB','IE','IS','CY','MT','SG','BH']);
+const LAND_BRIDGES = {
+  'GB-FR': true, 'FR-GB': true,
+  'SG-MY': true, 'MY-SG': true,
+  'DK-SE': true, 'SE-DK': true,
+  'IN-LK': false,
+};
+
+function landConnected(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const key = `${a}-${b}`;
+  if (key in LAND_BRIDGES) return LAND_BRIDGES[key];
+  const ca = CONTINENT[a], cb = CONTINENT[b];
+  if (!ca || !cb) return false;
+  if (ISLAND_NATIONS.has(a) || ISLAND_NATIONS.has(b)) return false;
+  if (ca === cb) return true;
+  const eurasia = new Set(['asia','europe']);
+  if (eurasia.has(ca) && eurasia.has(cb)) return true;
+  if (ca === 'africa' && eurasia.has(cb)) return true;
+  if (eurasia.has(ca) && cb === 'africa') return true;
+  if (ca === 'namerica' && cb === 'samerica') return true;
+  if (ca === 'samerica' && cb === 'namerica') return true;
+  return false;
+}
+
+function railConnected(a, b) {
+  if (!landConnected(a, b)) return false;
+  if (a === b) return true;
+  const RAIL = new Set([
+    'IN','NP','BD','PK','CN','RU','KZ',
+    'DE','FR','IT','ES','GB','NL','BE','CH','AT','PL','PT','SE','NO','DK','FI',
+    'CZ','HU','RO','BG','UA','SK','SI','HR','RS','LT','LV','EE','IE',
+    'US','CA','MX','BR','AR','CL','PE',
+    'ZA','EG','MA','KE','TN','DZ',
+  ]);
+  return RAIL.has(a) && RAIL.has(b);
+}
+
+/* ================================================================
+   FUEL PRICES
+   ================================================================ */
+const FALLBACK_FUEL = {
+  IN: { petrol: 106.31, diesel: 94.27, cng: 76.00, currency: 'INR', symbol: '₹' },
+  NP: { petrol: 168.00, diesel: 155.00, currency: 'NPR', symbol: 'रू' },
+  BD: { petrol: 130.00, diesel: 110.00, currency: 'BDT', symbol: '৳' },
+  LK: { petrol: 366.00, diesel: 340.00, currency: 'LKR', symbol: 'රු' },
+  PK: { petrol: 260.00, diesel: 270.00, currency: 'PKR', symbol: '₨' },
+  US: { petrol: 3.60, diesel: 4.10, currency: 'USD', symbol: '$' },
+  GB: { petrol: 1.55, diesel: 1.65, currency: 'GBP', symbol: '£' },
+  AE: { petrol: 2.95, diesel: 3.05, currency: 'AED', symbol: 'د.إ' },
+  SG: { petrol: 2.85, diesel: 2.80, currency: 'SGD', symbol: 'S$' },
+  DE: { petrol: 1.85, diesel: 1.75, currency: 'EUR', symbol: '€' },
+  FR: { petrol: 1.90, diesel: 1.82, currency: 'EUR', symbol: '€' },
+  JP: { petrol: 175.00, diesel: 155.00, currency: 'JPY', symbol: '¥' },
+  CN: { petrol: 8.20, diesel: 7.60, currency: 'CNY', symbol: '¥' },
+  AU: { petrol: 1.95, diesel: 2.05, currency: 'AUD', symbol: 'A$' },
+  CA: { petrol: 1.65, diesel: 1.75, currency: 'CAD', symbol: 'C$' },
+  RU: { petrol: 58.00, diesel: 65.00, currency: 'RUB', symbol: '₽' },
+  MY: { petrol: 2.05, diesel: 2.15, currency: 'MYR', symbol: 'RM' },
+  TH: { petrol: 38.00, diesel: 32.00, currency: 'THB', symbol: '฿' },
+  ZA: { petrol: 23.50, diesel: 21.00, currency: 'ZAR', symbol: 'R' },
+  BR: { petrol: 5.90, diesel: 6.20, currency: 'BRL', symbol: 'R$' },
+  EG: { petrol: 12.50, diesel: 11.00, currency: 'EGP', symbol: 'E£' },
+};
+
+async function fetchFuelPricesForCountry(countryCode) {
+  try {
+    const res = await fetch('https://openvan.camp/api/fuel/prices');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const entry = data.find(d => (d.country === countryCode || d.country_code === countryCode || d.countryCode === countryCode));
+        if (entry) {
+          return {
+            petrol: parseFloat(entry.petrol || entry.gasoline || 0) || null,
+            diesel: parseFloat(entry.diesel || 0) || null,
+            currency: entry.currency || 'USD',
+            symbol: entry.currency_symbol || '$',
+            source: 'live'
+          };
+        }
+      }
+    }
+  } catch {}
+  return FALLBACK_FUEL[countryCode] ? { ...FALLBACK_FUEL[countryCode], source: 'estimate' } : null;
+}
+
+async function renderFuelWidget(countries) {
+  const container = document.getElementById('fuelWidgetContainer');
+  const uniqueCountries = [...new Set(countries.filter(Boolean))];
+  const toFetch = uniqueCountries.length ? uniqueCountries : ['IN'];
+
+  container.innerHTML = `<div class="text-xs text-slate-400 animate-pulse">Loading fuel prices…</div>`;
+
+  const results = await Promise.all(toFetch.map(c => fetchFuelPricesForCountry(c)));
+
+  const cards = results.map((r, i) => {
+    if (!r) return '';
+    const cc = toFetch[i];
+    const countryName = getCountryName(cc);
+    const symbol = r.symbol || '₹';
+    const items = [];
+    if (r.petrol) items.push({ label: 'Petrol', value: r.petrol, color: 'text-red-600' });
+    if (r.diesel) items.push({ label: 'Diesel', value: r.diesel, color: 'text-amber-600' });
+    if (r.cng)    items.push({ label: 'CNG',    value: r.cng,    color: 'text-emerald-600' });
+
+    return `
+      <div class="mb-3 last:mb-0">
+        <div class="flex items-baseline justify-between mb-2">
+          <h3 class="text-[12px] font-semibold text-slate-700">${countryName}</h3>
+          <span class="fuel-badge ${r.source === 'live' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${r.source}</span>
+        </div>
+        <div class="grid grid-cols-3 gap-1.5 sm:gap-2">
+          ${items.map(it => `
+            <div class="bg-slate-50 rounded-lg px-2 sm:px-2.5 py-2">
+              <div class="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">${it.label}</div>
+              <div class="num text-[12px] sm:text-[13px] font-semibold ${it.color}">${symbol}${it.value.toFixed(2)}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="mb-2"><h3 class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Fuel prices</h3></div>${cards || '<div class="text-xs text-slate-400">No data available</div>'}`;
+}
+
+function getCountryName(code) {
+  const names = {
+    IN:'India', NP:'Nepal', BD:'Bangladesh', LK:'Sri Lanka', PK:'Pakistan',
+    US:'United States', GB:'United Kingdom', AE:'UAE', SG:'Singapore',
+    DE:'Germany', FR:'France', JP:'Japan', CN:'China', AU:'Australia',
+    CA:'Canada', RU:'Russia', MY:'Malaysia', TH:'Thailand', ZA:'South Africa',
+    BR:'Brazil', EG:'Egypt', MV:'Maldives', ID:'Indonesia', PH:'Philippines',
+    MX:'Mexico', AR:'Argentina', CL:'Chile', TR:'Turkey',
+  };
+  return names[code] || code;
+}
+
+renderFuelWidget(['IN']);
+
+/* ================================================================
+   TAB SWITCHING
+   ================================================================ */
+const tabRoute = document.getElementById('tabRoute');
+const tabTrip = document.getElementById('tabTrip');
+const routeTabContent = document.getElementById('routeTabContent');
+const tripTabContent = document.getElementById('tripTabContent');
+
+function activateTab(which) {
+  if (which === 'route') {
+    routeTabContent.style.display = 'block';
+    tripTabContent.style.display = 'none';
+    tabRoute.className = 'px-2.5 sm:px-3 lg:px-4 h-14 text-[13px] sm:text-sm font-medium border-b-2 transition-colors tab-active flex items-center gap-1.5 sm:gap-2';
+    tabTrip.className  = 'px-2.5 sm:px-3 lg:px-4 h-14 text-[13px] sm:text-sm font-medium border-b-2 transition-colors tab-inactive flex items-center gap-1.5 sm:gap-2';
+  } else {
+    routeTabContent.style.display = 'none';
+    tripTabContent.style.display = 'block';
+    tabRoute.className = 'px-2.5 sm:px-3 lg:px-4 h-14 text-[13px] sm:text-sm font-medium border-b-2 transition-colors tab-inactive flex items-center gap-1.5 sm:gap-2';
+    tabTrip.className  = 'px-2.5 sm:px-3 lg:px-4 h-14 text-[13px] sm:text-sm font-medium border-b-2 transition-colors tab-active flex items-center gap-1.5 sm:gap-2';
+  }
+  // Scroll the whole page to top on mobile (so user sees the form)
+  if (window.innerWidth < 1024) window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.querySelector('aside').scrollTop = 0;
+  setTimeout(invalidate, 100);
+}
+tabRoute.addEventListener('click', () => activateTab('route'));
+tabTrip.addEventListener('click',  () => activateTab('trip'));
+activateTab('route');
+
+/* ================================================================
+   MODE TOGGLE
+   ================================================================ */
+let optimizationMode = 'time';
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    optimizationMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach(b => {
+      if (b.dataset.mode === optimizationMode) {
+        b.className = `mode-btn text-xs font-medium py-2 rounded-md border transition-colors ${optimizationMode === 'time' ? 'active' : 'active-cost'}`;
+      } else {
+        b.className = 'mode-btn text-xs font-medium py-2 rounded-md border border-transparent text-slate-600 hover:bg-white';
+      }
+    });
+  });
+});
+
+document.getElementById('mileage').addEventListener('input', e => {
+  document.getElementById('mileageVal').textContent = e.target.value;
+});
+document.getElementById('fuelType').addEventListener('change', e => {
+  const p = { petrol: 106.31, diesel: 94.27, cng: 76.00 };
+  document.getElementById('fuelPrice').value = p[e.target.value].toFixed(2);
+});
+
+/* ================================================================
+   GEOCODING
+   ================================================================ */
+async function geocode(place) {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place)}&format=json&limit=1&addressdetails=1&accept-language=en`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const data = await res.json();
+  if (!data?.length) throw new Error(`Location not found: "${place}"`);
+  const country = data[0].address?.country_code?.toUpperCase() || '';
+  return {
+    lat: parseFloat(data[0].lat),
+    lon: parseFloat(data[0].lon),
+    name: data[0].display_name.split(',')[0].trim(),
+    country,
+  };
+}
+
+async function reverseGeocode(lat, lon) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10&addressdetails=1&accept-language=en`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if (data.address) {
+      return data.address.city || data.address.town || data.address.village ||
+             data.address.county || data.address.state ||
+             (data.display_name ? data.display_name.split(',')[0] : null);
+    }
+    return data.display_name ? data.display_name.split(',')[0] : null;
+  } catch { return null; }
+}
+
+/* ================================================================
+   OSRM
+   ================================================================ */
+async function getOSRMRoute(o, d) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${o.lon},${o.lat};${d.lon},${d.lat}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.code === 'NoRoute' || data.code === 'ImpossibleRoute' || !data.routes?.length) {
+    const err = new Error('No road route exists between these locations.');
+    err.code = 'NO_ROAD_ROUTE';
+    throw err;
+  }
+  const r = data.routes[0];
+  return { distance: r.distance / 1000, duration: r.duration / 3600, coordinates: r.geometry.coordinates };
+}
+
+/* ================================================================
+   GREAT-CIRCLE
+   ================================================================ */
+function greatCircleCoordinates(o, d, steps = 128) {
+  const toRad = x => x * Math.PI / 180;
+  const toDeg = x => x * 180 / Math.PI;
+  const φ1 = toRad(o.lat), λ1 = toRad(o.lon);
+  const φ2 = toRad(d.lat), λ2 = toRad(d.lon);
+  const Δσ = Math.acos(Math.max(-1, Math.min(1,
+    Math.sin(φ1) * Math.sin(φ2) + Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1)
+  )));
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    const A = Math.sin((1 - f) * Δσ) / Math.sin(Δσ);
+    const B = Math.sin(f * Δσ) / Math.sin(Δσ);
+    const x = A * Math.cos(φ1) * Math.cos(λ1) + B * Math.cos(φ2) * Math.cos(λ2);
+    const y = A * Math.cos(φ1) * Math.sin(λ1) + B * Math.cos(φ2) * Math.sin(λ2);
+    const z = A * Math.sin(φ1) + B * Math.sin(φ2);
+    const φ = Math.atan2(z, Math.sqrt(x * x + y * y));
+    const λ = Math.atan2(y, x);
+    coords.push([toDeg(λ), toDeg(φ)]);
+  }
+  const unfolded = [coords[0]];
+  for (let i = 1; i < coords.length; i++) {
+    let lon = coords[i][0];
+    const prevLon = unfolded[i - 1][0];
+    while (lon - prevLon > 180)  lon -= 360;
+    while (lon - prevLon < -180) lon += 360;
+    unfolded.push([lon, coords[i][1]]);
+  }
+  return unfolded;
+}
+
+/* ================================================================
+   WAYPOINTS
+   ================================================================ */
+async function findWaypointsAlongRoute(coords, totalDistance, totalTime) {
+  const waypoints = [];
+  const numSamples = Math.min(6, Math.max(3, Math.floor(coords.length / 20)));
+  for (let i = 1; i <= numSamples; i++) {
+    const frac = i / (numSamples + 1);
+    const idx = Math.floor(frac * (coords.length - 1));
+    let [lon, lat] = coords[idx];
+    if (lon > 180) lon -= 360;
+    if (lon < -180) lon += 360;
+    let cityName = null;
+    try { cityName = await reverseGeocode(lat, lon); } catch {}
+    waypoints.push({
+      lat, lon,
+      name: cityName || `Waypoint ${i}`,
+      distanceFromStart: totalDistance * frac,
+      timeFromStart: totalTime * frac,
+      distanceRemaining: totalDistance * (1 - frac),
+      timeRemaining: totalTime * (1 - frac),
+      progress: frac
+    });
+  }
+  return waypoints;
+}
+
+/* ================================================================
+   DIJKSTRA
+   ================================================================ */
+class MinHeap {
+  constructor() { this.h = []; }
+  push(node, priority) { this.h.push({ node, priority }); this._up(this.h.length - 1); }
+  pop() { if (!this.h.length) return null; const top = this.h[0], last = this.h.pop(); if (this.h.length) { this.h[0] = last; this._down(0); } return top; }
+  get size() { return this.h.length; }
+  _up(i) { while (i > 0) { const p = (i-1)>>1; if (this.h[p].priority <= this.h[i].priority) break; [this.h[p], this.h[i]] = [this.h[i], this.h[p]]; i = p; } }
+  _down(i) { const n = this.h.length; while (true) { let s = i; const l = 2*i+1, r = 2*i+2; if (l < n && this.h[l].priority < this.h[s].priority) s = l; if (r < n && this.h[r].priority < this.h[s].priority) s = r; if (s === i) break; [this.h[s], this.h[i]] = [this.h[i], this.h[s]]; i = s; } }
+}
+
+function dijkstra(graph, source, target, weightFn) {
+  const dist = {}, prev = {}; const visited = new Set(); const heap = new MinHeap();
+  for (const n in graph) dist[n] = Infinity;
+  dist[source] = 0; heap.push(source, 0);
+  while (heap.size) {
+    const { node: u } = heap.pop(); if (visited.has(u)) continue; visited.add(u); if (u === target) break;
+    for (const edge of graph[u] || []) {
+      if (visited.has(edge.to)) continue;
+      const alt = dist[u] + weightFn(edge);
+      if (alt < dist[edge.to]) { dist[edge.to] = alt; prev[edge.to] = u; heap.push(edge.to, alt); }
+    }
+  }
+  const path = []; let cur = target;
+  while (cur !== undefined) { path.unshift(cur); cur = prev[cur]; }
+  return { path, totalWeight: dist[target] };
+}
+
+function buildGraph(route, originName, destName) {
+  const numNodes = Math.max(3, Math.min(15, Math.round(route.distance / 60) + 2));
+  const nodes = [{ id: originName, cumDist: 0, cumTime: 0 }];
+  for (let i = 1; i < numNodes - 1; i++) {
+    const frac = i / (numNodes - 1);
+    nodes.push({ id: `WP-${i}`, cumDist: route.distance * frac, cumTime: route.duration * frac });
+  }
+  nodes.push({ id: destName, cumDist: route.distance, cumTime: route.duration });
+  const graph = {}; nodes.forEach(n => graph[n.id] = []);
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const segDist = nodes[i+1].cumDist - nodes[i].cumDist;
+    const segTime = nodes[i+1].cumTime - nodes[i].cumTime;
+    graph[nodes[i].id].push({ to: nodes[i+1].id, distance: segDist, time: segTime });
+    graph[nodes[i+1].id].push({ to: nodes[i].id, distance: segDist, time: segTime });
+  }
+  return { graph, nodeCount: nodes.length };
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/* ================================================================
+   TRANSPORT OPTIONS
+   ================================================================ */
+function buildFlightOptions(o, d, distance, sameCountry) {
+  if (distance < 250) return [];
+  const airportOverhead = 2.5, cruiseSpeed = 800;
+  const airports = getAirportCodes(o, d);
+  const airlines = sameCountry
+    ? [{ name:'IndiGo', code:'6E', mult:1.0 }, { name:'Air India', code:'AI', mult:1.15 }, { name:'Vistara', code:'UK', mult:1.25 }, { name:'SpiceJet', code:'SG', mult:0.9 }]
+    : [{ name:'Emirates', code:'EK', mult:1.4 }, { name:'Qatar Airways', code:'QR', mult:1.3 }, { name:'Singapore Airlines', code:'SQ', mult:1.5 }, { name:'Air India', code:'AI', mult:1.1 }];
+  const baseFare = sameCountry ? 1800 + distance * 2.8 : 6500 + distance * 3.5;
+  return airlines.slice(0, 4).map(airline => {
+    const flightNo = `${airline.code}-${Math.floor(100 + Math.random() * 899)}`;
+    const variance = 1 + (Math.random() * 0.25 - 0.1);
+    return {
+      mode:'Flight', operator: airline.name, flightNo,
+      duration: (distance / cruiseSpeed) + airportOverhead + (Math.random() * 0.5),
+      cost: Math.round(baseFare * airline.mult * variance),
+      icon:'plane', source: sameCountry ? 'Domestic' : 'International',
+      route: `${airports.from} → ${airports.to}`
+    };
+  });
+}
+
+function getAirportCodes(o, d) {
+  const map = {
+    'mumbai':'BOM','delhi':'DEL','new delhi':'DEL','bengaluru':'BLR','bangalore':'BLR',
+    'chennai':'MAA','kolkata':'CCU','hyderabad':'HYD','pune':'PNQ','ahmedabad':'AMD',
+    'goa':'GOI','kochi':'COK','jaipur':'JAI','lucknow':'LKO','varanasi':'VNS',
+    'kathmandu':'KTM','dhaka':'DAC','colombo':'CMB','islamabad':'ISB','karachi':'KHI',
+    'dubai':'DXB','abu dhabi':'AUH','singapore':'SIN','bangkok':'BKK',
+    'london':'LHR','paris':'CDG','frankfurt':'FRA','amsterdam':'AMS',
+    'new york':'JFK','los angeles':'LAX','chicago':'ORD','san francisco':'SFO',
+    'toronto':'YYZ','tokyo':'NRT','seoul':'ICN','shanghai':'PVG','hong kong':'HKG',
+    'sydney':'SYD','melbourne':'MEL','kuala lumpur':'KUL','doha':'DOH','istanbul':'IST',
+    'cairo':'CAI','johannesburg':'JNB','cape town':'CPT','nairobi':'NBO',
+  };
+  const find = (name) => {
+    const lower = name.toLowerCase();
+    for (const [k, code] of Object.entries(map)) if (lower.includes(k)) return code;
+    return name.substring(0, 3).toUpperCase();
+  };
+  return { from: find(o.name), to: find(d.name) };
+}
+
+function buildWaterwayOptions(o, d, distance) {
+  if (distance < 2000) return [];
+  const speed = 35;
+  const baseFare = 8000 + distance * 1.8;
+  return [
+    { mode:'Ship', operator:'Passenger Ferry', duration: distance / speed + 12, cost: Math.round(baseFare), icon:'ship', source:'Estimated', route:'Sea route' },
+    { mode:'Ship', operator:'Cargo Ship (cabin)', duration: distance / 40 + 24, cost: Math.round(baseFare * 0.65), icon:'ship', source:'Estimated', route:'Sea route' },
+  ];
+}
+
+function generateTrainOptions(o, d, distance, canRail) {
+  if (distance < 100 || !canRail) return [];
+  const sameCountry = o.country === d.country;
+  const baseDur = distance / 75 + 0.5;
+  return [
+    { mode:'Train', operator: sameCountry ? 'Rajdhani Express' : 'International Rail', trainNo:'—', duration: baseDur, cost: sameCountry ? 450 + distance*1.7 : 1200 + distance*2.5, icon:'train', source:'Estimated' },
+    { mode:'Train', operator: sameCountry ? 'Shatabdi Express' : 'Cross-border Rail', trainNo:'—', duration: baseDur * 1.15, cost: sameCountry ? 320 + distance*1.4 : 900 + distance*2.0, icon:'train', source:'Estimated' },
+    { mode:'Train', operator: sameCountry ? 'Garib Rath Express' : 'Sleeper Rail', trainNo:'—', duration: baseDur * 1.4, cost: sameCountry ? 180 + distance*0.9 : 550 + distance*1.4, icon:'train', source:'Estimated' },
+  ];
+}
+
+function generateBusOptions(o, d, distance, canLand) {
+  if (distance < 80 || !canLand) return [];
+  const sameCountry = o.country === d.country;
+  return [
+    { mode:'Bus', operator:'Volvo AC Sleeper', busNo:'—', duration: distance/55 + 1.5, cost: sameCountry ? 500 + distance*1.5 : 900 + distance*2.0, icon:'bus', source:'Estimated' },
+    { mode:'Bus', operator: sameCountry ? 'State Transport' : 'Cross-border Bus', busNo:'—', duration: distance/45 + 2, cost: sameCountry ? 200 + distance*0.8 : 450 + distance*1.3, icon:'bus', source:'Estimated' },
+  ];
+}
+
+function buildCabOptions(o, d, distance, canLand) {
+  if (!canLand || distance > 800) return [];
+  return [
+    { mode:'Cab', operator:'Ola · Sedan', duration: distance/55, cost: 500 + distance*12, icon:'car', source:'Estimated' },
+    { mode:'Cab', operator:'Uber · SUV', duration: distance/50, cost: 700 + distance*15, icon:'car', source:'Estimated' },
+  ];
+}
+
+/* ================================================================
+   MAP DRAWING
+   ================================================================ */
+function drawRoadRoute(coords, waypoints, originName, destName) {
+  if (routeLayer) map.removeLayer(routeLayer);
+  const latlngs = coords.map(c => [c[1], c[0]]);
+  const polyline = L.polyline(latlngs, { color: '#2563eb', weight: 4, opacity: 0.9, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+  const layers = [polyline];
+  layers.push(L.marker(latlngs[0], { icon: startIcon }).bindPopup(`<strong>Start</strong><br>${originName}`));
+  layers.push(L.marker(latlngs[latlngs.length-1], { icon: endIcon }).bindPopup(`<strong>End</strong><br>${destName}`));
+  waypoints.forEach(wp => {
+    layers.push(L.marker([wp.lat, wp.lon], { icon: wpIcon }).bindPopup(
+      `<strong>${wp.name}</strong><br><span style="color:#64748b">${Math.round(wp.progress*100)}% complete</span><br>` +
+      `<span style="color:#2563eb">From start: ${wp.distanceFromStart.toFixed(0)} km · ${formatDuration(wp.timeFromStart)}</span><br>` +
+      `<span style="color:#059669">To go: ${wp.distanceRemaining.toFixed(0)} km · ${formatDuration(wp.timeRemaining)}</span>`
+    ));
+  });
+  routeLayer = L.layerGroup(layers).addTo(map);
+  map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+  document.getElementById('mapLegend').classList.remove('hidden');
+  document.getElementById('mapModeLabel').classList.add('hidden');
+  setTimeout(invalidate, 150);
+}
+
+function drawGreatCircleRoute(coords, waypoints, originName, destName) {
+  if (routeLayer) map.removeLayer(routeLayer);
+  const latlngs = coords.map(c => [c[1], c[0]]);
+
+  let polyline;
+  try {
+    polyline = new L.Wrapped.Polyline(latlngs, {
+      color: '#f59e0b', weight: 3, opacity: 0.9, dashArray: '8, 8', lineJoin: 'round'
+    }).addTo(map);
+  } catch (e) {
+    console.warn('Wrapped.Polyline failed, using fallback', e);
+    polyline = splitAndDrawAt180(latlngs);
+  }
+
+  const layers = [polyline];
+  layers.push(L.marker([coords[0][1], coords[0][0]], { icon: startIcon }).bindPopup(`<strong>Start</strong><br>${originName}`));
+  const last = coords[coords.length - 1];
+  layers.push(L.marker([last[1], last[0]], { icon: endIcon }).bindPopup(`<strong>End</strong><br>${destName}`));
+
+  waypoints.forEach(wp => {
+    layers.push(L.marker([wp.lat, wp.lon], { icon: wpIcon }).bindPopup(
+      `<strong>${wp.name}</strong><br><span style="color:#64748b">${Math.round(wp.progress*100)}% complete</span><br>` +
+      `<span style="color:#2563eb">From start: ${wp.distanceFromStart.toFixed(0)} km · ${formatDuration(wp.timeFromStart)}</span><br>` +
+      `<span style="color:#059669">To go: ${wp.distanceRemaining.toFixed(0)} km · ${formatDuration(wp.timeRemaining)}</span>`
+    ));
+  });
+
+  routeLayer = L.layerGroup(layers).addTo(map);
+  const lats = latlngs.map(l => l[0]);
+  const lons = latlngs.map(l => l[1]);
+  const bounds = L.latLngBounds([Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]);
+  map.fitBounds(bounds, { padding: [40, 40] });
+
+  document.getElementById('mapLegend').classList.remove('hidden');
+  document.getElementById('mapModeLabel').classList.remove('hidden');
+  setTimeout(invalidate, 150);
+}
+
+function splitAndDrawAt180(latlngs) {
+  const segmentA = [], segmentB = [];
+  let phase = 'A';
+  for (let i = 0; i < latlngs.length; i++) {
+    const [lat, lon] = latlngs[i];
+    if (phase === 'A') {
+      segmentA.push([lat, lon]);
+      if (lon > 180) phase = 'B';
+    } else {
+      segmentB.push([lat, lon - 360]);
+    }
+  }
+  const group = L.layerGroup();
+  if (segmentA.length > 1) L.polyline(segmentA, { color:'#f59e0b', weight:3, opacity:0.9, dashArray:'8,8' }).addTo(group);
+  if (segmentB.length > 1) L.polyline(segmentB, { color:'#f59e0b', weight:3, opacity:0.9, dashArray:'8,8' }).addTo(group);
+  group.addTo(map);
+  return group;
+}
+
+/* ================================================================
+   FORMAT HELPERS
+   ================================================================ */
+function formatDuration(h) {
+  if (!isFinite(h) || h < 0) return '—';
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  return mm ? `${hh}h ${mm}m` : `${hh}h`;
+}
+function formatCost(c, symbol = '₹') { return symbol + Math.round(c).toLocaleString('en-IN'); }
+
+const ICONS = {
+  plane: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`,
+  train: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16M12 3v8M8 19l-2 3M16 19l2 3M8 15h.01M16 15h.01"/></svg>`,
+  bus:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6M16 6v6M2 12h20M6 18h2M16 18h2"/><rect x="4" y="3" width="16" height="16" rx="2"/></svg>`,
+  car:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M5 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM23 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM3 17V9l2-5h14l2 5v8"/></svg>`,
+  ship:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2M4 20V10l8-6 8 6v10"/><path d="M12 22V4"/></svg>`,
+};
+
+/* ================================================================
+   RECOMMENDATIONS + RENDERERS
+   ================================================================ */
+function buildRecommendations(allModes) {
+  if (!allModes.length) return null;
+  const fastest  = allModes.reduce((a, b) => (b.duration < a.duration ? b : a), allModes[0]);
+  const cheapest = allModes.reduce((a, b) => (b.cost < a.cost ? b : a), allModes[0]);
+  const maxTime = Math.max(...allModes.map(m => m.duration), 1);
+  const maxCost = Math.max(...allModes.map(m => m.cost), 1);
+  const bestValue = [...allModes]
+    .map(m => ({ ...m, _score: (m.duration / maxTime) * 0.5 + (m.cost / maxCost) * 0.5 }))
+    .sort((a, b) => a._score - b._score)[0];
+  return { fastest, cheapest, bestValue };
+}
+
+function renderRecommendationPanel(rec) {
+  if (!rec) return '';
+  const { fastest, cheapest, bestValue } = rec;
+  return `
+    <div class="pt-5 border-t border-slate-100">
+      <div class="rounded-lg border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-3.5 sm:p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-6 h-6 rounded-md bg-brand-600 flex items-center justify-center flex-shrink-0">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <span class="text-[11px] font-semibold text-brand-700 uppercase tracking-wider">Quick Recommendation</span>
+        </div>
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-[10px] uppercase tracking-wider text-slate-500 w-14 sm:w-16 shrink-0">Fastest</span>
+              <span class="text-[12px] font-semibold text-slate-900 truncate">${fastest.operator}</span>
+            </div>
+            <span class="num text-[11px] font-semibold text-brand-700 shrink-0">${formatDuration(fastest.duration)}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-[10px] uppercase tracking-wider text-slate-500 w-14 sm:w-16 shrink-0">Cheapest</span>
+              <span class="text-[12px] font-semibold text-slate-900 truncate">${cheapest.operator}</span>
+            </div>
+            <span class="num text-[11px] font-semibold text-emerald-700 shrink-0">${formatCost(cheapest.cost)}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3 pt-2 border-t border-brand-200/50">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-[10px] uppercase tracking-wider text-slate-500 w-14 sm:w-16 shrink-0">Best value</span>
+              <span class="text-[12px] font-semibold text-slate-900 truncate">${bestValue.operator}</span>
+            </div>
+            <div class="flex flex-col items-end shrink-0">
+              <span class="num text-[11px] font-semibold text-slate-900">${formatCost(bestValue.cost)}</span>
+              <span class="num text-[10px] text-slate-500">${formatDuration(bestValue.duration)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderWaypointTable(waypoints, originName, destName, totalDistance, totalTime) {
+  if (!waypoints.length) return '';
+  return `
+    <div class="pt-5 border-t border-slate-100">
+      <div class="text-[11px] font-semibold text-slate-700 uppercase tracking-wider mb-3">Cities along route</div>
+      <div class="rounded-lg border border-slate-200 overflow-hidden table-scroll">
+        <table class="w-full text-[11px]">
+          <thead class="bg-slate-50">
+            <tr class="text-left text-slate-500 uppercase tracking-wider">
+              <th class="px-3 py-2 font-medium">City</th>
+              <th class="px-3 py-2 font-medium text-right whitespace-nowrap">To go</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            <tr class="bg-emerald-50/40">
+              <td class="px-3 py-2 font-medium text-slate-900">${originName} <span class="text-[9px] text-emerald-700 uppercase ml-1">start</span></td>
+              <td class="px-3 py-2 text-right num text-slate-700 whitespace-nowrap">${totalDistance.toFixed(0)} km · ${formatDuration(totalTime)}</td>
+            </tr>
+            ${waypoints.map(wp => `
+              <tr>
+                <td class="px-3 py-2 text-slate-700 truncate max-w-[140px]">${wp.name}</td>
+                <td class="px-3 py-2 text-right num text-slate-700 whitespace-nowrap">${wp.distanceRemaining.toFixed(0)} km · ${formatDuration(wp.timeRemaining)}</td>
+              </tr>`).join('')}
+            <tr class="bg-red-50/40">
+              <td class="px-3 py-2 font-medium text-slate-900">${destName} <span class="text-[9px] text-red-700 uppercase ml-1">end</span></td>
+              <td class="px-3 py-2 text-right num text-slate-500">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderModeGroups(groups, rec) {
+  return groups.map(group => `
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-slate-700 flex-shrink-0">${ICONS[group.items[0].icon]}</div>
+        <span class="text-[12px] font-semibold text-slate-800 uppercase tracking-wide">${group.key}</span>
+      </div>
+      <div class="space-y-2">
+        ${group.items.map(opt => {
+          const isFastest = rec && opt === rec.fastest;
+          const isCheapest = rec && opt === rec.cheapest;
+          const isBestValue = rec && opt === rec.bestValue;
+          const hl = isFastest || isCheapest || isBestValue;
+          return `
+            <div class="rec-card rounded-lg border ${hl ? 'border-brand-200 bg-brand-50/40' : 'border-slate-200 bg-white'} p-3">
+              <div class="flex items-start justify-between mb-2 gap-2">
+                <div class="min-w-0 flex-1">
+                  <div class="text-[13px] font-semibold text-slate-900 leading-tight truncate">${opt.operator}</div>
+                  <div class="text-[11px] text-slate-500 leading-tight mt-0.5 truncate">
+                    ${opt.flightNo || ''}${opt.trainNo ? '#' + opt.trainNo : ''}${opt.busNo ? '#' + opt.busNo : ''}${opt.route ? ' · ' + opt.route : ''}${opt.source ? ' · ' + opt.source : ''}
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1 items-end shrink-0">
+                  ${isFastest  ? '<span class="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-brand-100 text-brand-700 font-medium">Fastest</span>' : ''}
+                  ${isCheapest ? '<span class="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Cheapest</span>' : ''}
+                  ${isBestValue && !isFastest && !isCheapest ? '<span class="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white font-medium">Best</span>' : ''}
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Duration</div><div class="num text-[13px] font-semibold text-slate-900">${formatDuration(opt.duration)}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Est. cost</div><div class="num text-[13px] font-semibold text-slate-900">${formatCost(opt.cost)}</div></div>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+
+/* ================================================================
+   ROUTE FORM
+   ================================================================ */
+const routeForm = document.getElementById('routeForm');
+const routeError = document.getElementById('routeError');
+const routeResult = document.getElementById('routeResult');
+const mapLoading = document.getElementById('mapLoading');
+const mapPlaceholder = document.getElementById('mapPlaceholder');
+const routeSubmitText = document.getElementById('routeSubmitText');
+
+routeForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  routeError.classList.add('hidden');
+  routeResult.classList.add('hidden');
+  routeResult.innerHTML = '';
+  mapPlaceholder.style.display = 'none';
+  mapLoading.classList.remove('hidden');
+  routeSubmitText.innerHTML = '<span class="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>';
+
+  // On mobile, scroll down to map so user sees progress
+  if (window.innerWidth < 1024) {
+    document.querySelector('main').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const origin = document.getElementById('origin').value.trim();
+  const destination = document.getElementById('destination').value.trim();
+  const fuelPrice = parseFloat(document.getElementById('fuelPrice').value) || 100;
+  const mileage = parseFloat(document.getElementById('mileage').value) || 15;
+
+  try {
+    if (!origin || !destination) throw new Error('Please enter both origin and destination.');
+    const [o, d] = await Promise.all([geocode(origin), geocode(destination)]);
+
+    const countries = [];
+    if (o.country) countries.push(o.country);
+    if (d.country && d.country !== o.country) countries.push(d.country);
+    renderFuelWidget(countries);
+
+    const straightDistance = haversine(o.lat, o.lon, d.lat, d.lon);
+    const sameCountry = o.country === d.country;
+    const canLand = landConnected(o.country, d.country);
+    const canRail = railConnected(o.country, d.country);
+
+    let coords, totalDistance, totalTime, usedGreatCircle = false, roadRoute = null;
+
+    if (canLand) {
+      try {
+        roadRoute = await getOSRMRoute(o, d);
+        coords = roadRoute.coordinates;
+        totalDistance = roadRoute.distance;
+        totalTime = roadRoute.duration;
+      } catch (err) {
+        if (err.code === 'NO_ROAD_ROUTE') usedGreatCircle = true;
+        else throw err;
+      }
+    } else {
+      usedGreatCircle = true;
+    }
+
+    if (usedGreatCircle) {
+      coords = greatCircleCoordinates(o, d, 128);
+      totalDistance = straightDistance * 1.05;
+      totalTime = totalDistance / 800 + 2.5;
+    }
+
+    const waypoints = await findWaypointsAlongRoute(coords, totalDistance, totalTime);
+
+    if (usedGreatCircle) drawGreatCircleRoute(coords, waypoints, o.name, d.name);
+    else drawRoadRoute(coords, waypoints, o.name, d.name);
+
+    const flightOptions = buildFlightOptions(o, d, straightDistance, sameCountry);
+    const trainOptions  = generateTrainOptions(o, d, straightDistance, canRail);
+    const busOptions    = generateBusOptions(o, d, straightDistance, canLand);
+    const cabOptions    = buildCabOptions(o, d, straightDistance, canLand);
+    const shipOptions   = usedGreatCircle ? buildWaterwayOptions(o, d, straightDistance) : [];
+
+    if (usedGreatCircle) {
+      showCrossContinentResult({ o, d, totalDistance, totalTime, waypoints, flightOptions, shipOptions });
+    } else {
+      const { graph, nodeCount } = buildGraph(roadRoute, o.name, d.name);
+      const weightFn = edge => optimizationMode === 'time' ? edge.time : (edge.distance / mileage) * fuelPrice;
+      const { path } = dijkstra(graph, o.name, d.name, weightFn);
+      const fuelCost = (totalDistance / mileage) * fuelPrice;
+      showRoadResult({
+        o, d, totalDistance, totalTime, fuelCost, fuelPrice, mileage,
+        path, nodeCount, waypoints, flightOptions, trainOptions, busOptions, cabOptions
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    routeError.textContent = err.message || 'Could not compute route.';
+    routeError.classList.remove('hidden');
+    mapPlaceholder.style.display = 'flex';
+  } finally {
+    mapLoading.classList.add('hidden');
+    routeSubmitText.textContent = 'Calculate route';
+  }
+});
+
+/* ================================================================
+   ROAD RESULT
+   ================================================================ */
+function showRoadResult(data) {
+  const timeStr = data.totalTime >= 1 ? `${data.totalTime.toFixed(2)} hrs` : `${Math.round(data.totalTime * 60)} min`;
+  const roadCar = { mode:'Car', operator:'Self drive', duration:data.totalTime, cost:data.fuelCost, icon:'car', source:'Road route' };
+  const allModes = [roadCar, ...data.flightOptions, ...data.trainOptions, ...data.busOptions, ...data.cabOptions];
+  const rec = buildRecommendations(allModes);
+  const groups = [
+    { key:'Flight', items: data.flightOptions },
+    { key:'Train',  items: data.trainOptions },
+    { key:'Bus',    items: data.busOptions },
+    { key:'Cab',    items: data.cabOptions },
+    { key:'Car',    items: [roadCar] }
+  ].filter(g => g.items.length > 0);
+
+  const crossBorderNote = (data.o.country !== data.d.country)
+    ? `<div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-[11px] text-blue-800">
+        <strong>Cross-border route.</strong> Fuel prices shown for both ${getCountryName(data.o.country)} and ${getCountryName(data.d.country)}.
+       </div>` : '';
+
+  routeResult.innerHTML = `
+    <div class="fade-in space-y-5">
+      ${crossBorderNote}
+      <div>
+        <div class="flex items-center justify-between mb-3 gap-2">
+          <h3 class="text-[13px] font-medium text-slate-700">Road route summary</h3>
+          <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${optimizationMode === 'cost' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-brand-50 text-brand-700 border border-brand-200'} shrink-0">${optimizationMode === 'time' ? 'Fastest' : 'Cheapest'}</span>
+        </div>
+        <div class="rounded-lg border border-slate-200 overflow-hidden">
+          <div class="grid grid-cols-3 divide-x divide-slate-200">
+            <div class="px-2.5 sm:px-3 py-3"><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Time</div><div class="num text-[13px] sm:text-sm font-semibold text-slate-900">${timeStr}</div></div>
+            <div class="px-2.5 sm:px-3 py-3"><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Distance</div><div class="num text-[13px] sm:text-sm font-semibold text-slate-900">${data.totalDistance.toFixed(1)} km</div></div>
+            <div class="px-2.5 sm:px-3 py-3"><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Fuel cost</div><div class="num text-[13px] sm:text-sm font-semibold text-slate-900">₹${data.fuelCost.toFixed(2)}</div></div>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+          <div class="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>${data.mileage} km/L · ₹${data.fuelPrice}/L</div>
+          <div class="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>${data.nodeCount} nodes</div>
+        </div>
+        <div class="mt-4">
+          <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Dijkstra path</div>
+          <div class="flex flex-wrap items-center gap-1">
+            ${data.path.map((step, i) => `<span class="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded">${step}</span>${i < data.path.length - 1 ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' : ''}`).join('')}
+          </div>
+        </div>
+      </div>
+      ${renderRecommendationPanel(rec)}
+      ${renderWaypointTable(data.waypoints, data.o.name, data.d.name, data.totalDistance, data.totalTime)}
+      <div class="pt-5 border-t border-slate-100 space-y-5">
+        <div class="text-[11px] font-semibold text-slate-700 uppercase tracking-wider">Transport options</div>
+        ${renderModeGroups(groups, rec)}
+      </div>
+    </div>`;
+  routeResult.classList.remove('hidden');
+  if (window.innerWidth >= 1024) routeResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ================================================================
+   CROSS-CONTINENT RESULT
+   ================================================================ */
+function showCrossContinentResult(data) {
+  const { o, d, totalDistance, totalTime, waypoints, flightOptions, shipOptions } = data;
+  const allModes = [...flightOptions, ...shipOptions];
+  const rec = buildRecommendations(allModes);
+  const groups = [
+    { key:'Flight', items: flightOptions },
+    { key:'Ship / Ferry', items: shipOptions },
+  ].filter(g => g.items.length > 0);
+
+  routeResult.innerHTML = `
+    <div class="fade-in space-y-5">
+      <div class="rounded-lg border border-amber-200 bg-amber-50 p-3.5">
+        <div class="flex gap-2.5">
+          <div class="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div>
+            <div class="text-[12px] font-semibold text-amber-900 mb-0.5">No direct road or rail route</div>
+            <div class="text-[11px] text-amber-800 leading-relaxed">
+              ${o.name} (${getCountryName(o.country)}) and ${d.name} (${getCountryName(d.country)}) are not connected by land. Available: air and sea.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="text-[13px] font-medium text-slate-700 mb-3">Air / sea corridor</div>
+        <div class="rounded-lg border border-slate-200 overflow-hidden">
+          <div class="grid grid-cols-3 divide-x divide-slate-200">
+            <div class="px-2.5 sm:px-3 py-3"><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Distance</div><div class="num text-[13px] sm:text-sm font-semibold text-slate-900">${totalDistance.toFixed(0)} km</div></div>
+            <div class="px-2.5 sm:px-3 py-3"><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Time</div><div class="num text-[13px] sm:text-sm font-semibold text-slate-900">${formatDuration(totalTime)}</div></div>
+            <div class="px-2.5 sm:px-3 py-3"><div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Type</div><div class="text-[13px] sm:text-sm font-semibold text-amber-700">Air / Sea</div></div>
+          </div>
+        </div>
+      </div>
+      ${renderRecommendationPanel(rec)}
+      ${renderWaypointTable(waypoints, o.name, d.name, totalDistance, totalTime)}
+      <div class="pt-5 border-t border-slate-100 space-y-5">
+        <div class="text-[11px] font-semibold text-slate-700 uppercase tracking-wider">Available transport</div>
+        ${renderModeGroups(groups, rec)}
+      </div>
+      <p class="text-[10px] text-slate-400 text-center leading-relaxed">
+        Rail, road and bus are not available between different landmasses.
+      </p>
+    </div>`;
+  routeResult.classList.remove('hidden');
+  if (window.innerWidth >= 1024) routeResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ================================================================
+   TRIP PLANNER
+   ================================================================ */
+const tripForm = document.getElementById('tripForm');
+const tripError = document.getElementById('tripError');
+const tripResult = document.getElementById('tripResult');
+const tripSubmitText = document.getElementById('tripSubmitText');
+
+tripForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  tripError.classList.add('hidden');
+  tripResult.innerHTML = '';
+  tripSubmitText.innerHTML = '<span class="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>';
+
+  if (window.innerWidth < 1024) {
+    document.querySelector('main').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const origin = document.getElementById('tripOrigin').value.trim();
+  const destination = document.getElementById('tripDestination').value.trim();
+
+  try {
+    if (!origin || !destination) throw new Error('Please enter both origin and destination.');
+    const [o, d] = await Promise.all([geocode(origin), geocode(destination)]);
+    const countries = [];
+    if (o.country) countries.push(o.country);
+    if (d.country && d.country !== o.country) countries.push(d.country);
+    renderFuelWidget(countries);
+
+    const distance = haversine(o.lat, o.lon, d.lat, d.lon);
+    const sameCountry = o.country === d.country;
+    const canLand = landConnected(o.country, d.country);
+    const canRail = railConnected(o.country, d.country);
+
+    let usedGreatCircle = false;
+    let coords, totalDistance = distance, totalTime = distance / 800 + 2.5;
+
+    if (canLand) {
+      try {
+        const r = await getOSRMRoute(o, d);
+        coords = r.coordinates;
+        totalDistance = r.distance;
+        totalTime = r.duration;
+      } catch (err) {
+        if (err.code === 'NO_ROAD_ROUTE') {
+          usedGreatCircle = true;
+          coords = greatCircleCoordinates(o, d, 128);
+        } else throw err;
+      }
+    } else {
+      usedGreatCircle = true;
+      coords = greatCircleCoordinates(o, d, 128);
+    }
+
+    const waypoints = await findWaypointsAlongRoute(coords, totalDistance, totalTime);
+
+    if (usedGreatCircle) drawGreatCircleRoute(coords, waypoints, o.name, d.name);
+    else drawRoadRoute(coords, waypoints, o.name, d.name);
+    mapPlaceholder.style.display = 'none';
+
+    const flightOptions = buildFlightOptions(o, d, distance, sameCountry);
+    const trainOptions  = generateTrainOptions(o, d, distance, canRail);
+    const busOptions    = generateBusOptions(o, d, distance, canLand);
+    const cabOptions    = buildCabOptions(o, d, distance, canLand);
+    const shipOptions   = usedGreatCircle ? buildWaterwayOptions(o, d, distance) : [];
+
+    renderTripResult({ flights: flightOptions, trains: trainOptions, buses: busOptions, cabs: cabOptions, ships: shipOptions, usedGreatCircle, distance, totalDistance, totalTime, waypoints, o, d, canLand, canRail, sameCountry });
+
+  } catch (err) {
+    console.error(err);
+    tripError.textContent = err.message || 'Could not plan trip.';
+    tripError.classList.remove('hidden');
+  } finally {
+    tripSubmitText.textContent = 'Compare options';
+  }
+});
+
+function renderTripResult({ flights, trains, buses, cabs, ships, usedGreatCircle, distance, totalDistance, totalTime, waypoints, o, d, canLand, canRail, sameCountry }) {
+  const allModes = [];
+  if (canLand && !usedGreatCircle) {
+    allModes.push({ mode:'Car', operator:'Self drive', duration: distance / 55, cost: 150 + (distance/15)*106 + distance*1.2, icon:'car', source:'Estimated' });
+  }
+  flights.forEach(f => allModes.push(f));
+  trains.forEach(t => allModes.push(t));
+  buses.forEach(b => allModes.push(b));
+  cabs.forEach(c => allModes.push(c));
+  ships.forEach(s => allModes.push(s));
+
+  if (!allModes.length) {
+    tripResult.innerHTML = `<div class="pt-5 border-t border-slate-100 text-center text-xs text-slate-500">No transport options available for this route.</div>`;
+    return;
+  }
+
+  const rec = buildRecommendations(allModes);
+  if (!rec) {
+    tripResult.innerHTML = `<div class="pt-5 border-t border-slate-100 text-center text-xs text-slate-500">Could not compute recommendations.</div>`;
+    return;
+  }
+
+  const groups = [
+    { key:'Flight', items: flights },
+    { key:'Train',  items: trains },
+    { key:'Bus',    items: buses },
+    { key:'Cab',    items: cabs },
+    { key:'Ship',   items: ships },
+    { key:'Car',    items: allModes.filter(m => m.mode === 'Car') }
+  ].filter(g => g.items.length > 0);
+
+  let contextNote = '';
+  if (usedGreatCircle) {
+    contextNote = `<div class="rounded-lg border border-amber-200 bg-amber-50 p-3"><div class="text-[11px] text-amber-800 leading-relaxed"><strong>Air and sea only.</strong> ${o.name} and ${d.name} are on different landmasses.</div></div>`;
+  } else if (!sameCountry && canLand) {
+    contextNote = `<div class="rounded-lg border border-blue-200 bg-blue-50 p-3"><div class="text-[11px] text-blue-800 leading-relaxed"><strong>Cross-border route.</strong> ${getCountryName(o.country)} → ${getCountryName(d.country)}. Road, rail and bus available.${!canRail ? ' Rail services may be limited.' : ''}</div></div>`;
+  }
+
+  tripResult.innerHTML = `
+    <div class="fade-in pt-5 border-t border-slate-100 space-y-4">
+      ${contextNote}
+      ${renderRecommendationPanel(rec)}
+      ${renderWaypointTable(waypoints, o.name, d.name, totalDistance, totalTime)}
+      <div class="space-y-5">
+        ${renderModeGroups(groups, rec)}
+      </div>
+      <p class="text-[10px] text-slate-400 text-center leading-relaxed">
+        Estimates based on distance and country fuel data. Actual fares vary.
+      </p>
+    </div>`;
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+window.addEventListener('load', () => {
+  invalidate();
+  setTimeout(invalidate, 300);
+  setTimeout(invalidate, 800);
+});
+
+// Re-check map size when the mobile keyboard closes
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => setTimeout(invalidate, 100));
+}
+
+// Prevent body scroll jump when tab switches on mobile
+document.addEventListener('gesturestart', e => e.preventDefault());
+</script>
+
+</body>
+</html>
